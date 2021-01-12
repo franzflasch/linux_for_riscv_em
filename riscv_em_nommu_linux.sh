@@ -31,9 +31,7 @@ patch -p1 < 0007-add-busybox-small.config.patch
 make -j16
 
 ## Linux
-
 cd ${WORK_DIR}
-
 wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${LINUX_VERSION}.tar.xz
 tar xvf linux-${LINUX_VERSION}.tar.xz
 ln -s linux-${LINUX_VERSION} linux
