@@ -7,7 +7,7 @@ This was tested in ubuntu 20.04
 1. Install my latest riscv64 baremetal toolchain from here:  
 https://nightly.link/franzflasch/build-tools-gcc/workflows/riscv64-baremetal/master/toolchain_built_from_tar.zip
 
-And add the bin folder to $PATH  
+And add its bin folder to $PATH  
 
 2. Install prerequisites
 ```sh
