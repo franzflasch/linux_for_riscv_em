@@ -1,0 +1,80 @@
+From a8867a6affe8eec5151fc7319f62538a3deb0109 Mon Sep 17 00:00:00 2001
+From: Franz Flasch <franz.flasch@gmx.at>
+Date: Fri, 8 Jan 2021 09:52:35 +0000
+Subject: [PATCH] Revert "binfmt_flat: revert "binfmt_flat: don't offset the
+ data start""
+
+This reverts commit 2217b982624680d19a80ebb4600d05c8586c4f96.
+---
+ fs/binfmt_flat.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
+
+diff --git a/fs/binfmt_flat.c b/fs/binfmt_flat.c
+index b9c658e0548e..f2f9086ebe98 100644
+--- a/fs/binfmt_flat.c
++++ b/fs/binfmt_flat.c
+@@ -576,7 +576,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 			goto err;
+ 		}
+ 
+-		len = data_len + extra + MAX_SHARED_LIBS * sizeof(unsigned long);
++		len = data_len + extra;
+ 		len = PAGE_ALIGN(len);
+ 		realdatastart = vm_mmap(NULL, 0, len,
+ 			PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE, 0);
+@@ -590,9 +590,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 			vm_munmap(textpos, text_len);
+ 			goto err;
+ 		}
+-		datapos = ALIGN(realdatastart +
+-				MAX_SHARED_LIBS * sizeof(unsigned long),
+-				FLAT_DATA_ALIGN);
++		datapos = ALIGN(realdatastart, FLAT_DATA_ALIGN);
+ 
+ 		pr_debug("Allocated data+bss+stack (%u bytes): %lx\n",
+ 			 data_len + bss_len + stack_len, datapos);
+@@ -622,7 +620,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 		memp_size = len;
+ 	} else {
+ 
+-		len = text_len + data_len + extra + MAX_SHARED_LIBS * sizeof(u32);
++		len = text_len + data_len + extra;
+ 		len = PAGE_ALIGN(len);
+ 		textpos = vm_mmap(NULL, 0, len,
+ 			PROT_READ | PROT_EXEC | PROT_WRITE, MAP_PRIVATE, 0);
+@@ -637,9 +635,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 		}
+ 
+ 		realdatastart = textpos + ntohl(hdr->data_start);
+-		datapos = ALIGN(realdatastart +
+-				MAX_SHARED_LIBS * sizeof(u32),
+-				FLAT_DATA_ALIGN);
++		datapos = ALIGN(realdatastart, FLAT_DATA_ALIGN);
+ 
+ 		reloc = (__be32 __user *)
+ 			(datapos + (ntohl(hdr->reloc_start) - text_len));
+@@ -656,8 +652,9 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 					 (text_len + full_data
+ 						  - sizeof(struct flat_hdr)),
+ 					 0);
+-			memmove((void *) datapos, (void *) realdatastart,
+-					full_data);
++			if (datapos != realdatastart)
++				memmove((void *)datapos, (void *)realdatastart,
++						full_data);
+ #else
+ 			/*
+ 			 * This is used on MMU systems mainly for testing.
+@@ -713,8 +710,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 		if (IS_ERR_VALUE(result)) {
+ 			ret = result;
+ 			pr_err("Unable to read code+data+bss, errno %d\n", ret);
+-			vm_munmap(textpos, text_len + data_len + extra +
+-				MAX_SHARED_LIBS * sizeof(u32));
++			vm_munmap(textpos, text_len + data_len + extra);
+ 			goto err;
+ 		}
+ 	}
+-- 
+2.25.1
+

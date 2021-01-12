@@ -1,0 +1,25 @@
+From 10f12269a1e5c703f8a6bd9d4f2f269430efa166 Mon Sep 17 00:00:00 2001
+From: Franz Flasch <franz.flasch@gmx.at>
+Date: Tue, 12 Jan 2021 14:33:03 +0000
+Subject: [PATCH 1/6] Make MMU for riscv optional
+
+---
+ arch/Config.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/Config.in b/arch/Config.in
+index 155403c..5543718 100644
+--- a/arch/Config.in
++++ b/arch/Config.in
+@@ -210,7 +210,7 @@ config BR2_powerpc64le
+ 
+ config BR2_riscv
+ 	bool "RISCV"
+-	select BR2_ARCH_HAS_MMU_MANDATORY
++	select BR2_ARCH_HAS_MMU_OPTIONAL
+ 	select BR2_ARCH_NEEDS_GCC_AT_LEAST_7
+ 	help
+ 	  RISC-V is an open, free Instruction Set Architecture created
+-- 
+2.25.1
+

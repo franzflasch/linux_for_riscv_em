@@ -1,0 +1,717 @@
+Index: linux/drivers/tty/serial/Makefile
+===================================================================
+--- linux.orig/drivers/tty/serial/Makefile
++++ linux/drivers/tty/serial/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_SERIAL_CORE) += serial_core
+ obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
+ obj-$(CONFIG_SERIAL_EARLYCON_ARM_SEMIHOST) += earlycon-arm-semihost.o
+ obj-$(CONFIG_SERIAL_EARLYCON_RISCV_SBI) += earlycon-riscv-sbi.o
++obj-$(CONFIG_SERIAL_EARLYCON_SIMPLE_UART) += earlycon-simple-uart.o
+ 
+ # These Sparc drivers have to appear before others such as 8250
+ # which share ttySx minor node space.  Otherwise console device
+@@ -76,6 +77,7 @@ obj-$(CONFIG_SERIAL_TEGRA_TCU) += tegra-
+ obj-$(CONFIG_SERIAL_AR933X)   += ar933x_uart.o
+ obj-$(CONFIG_SERIAL_EFM32_UART) += efm32-uart.o
+ obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
++obj-$(CONFIG_SIMPLE_UART)	+= simple-uart.o
+ obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
+ obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
+ obj-$(CONFIG_SERIAL_FSL_LINFLEXUART)	+= fsl_linflexuart.o
+Index: linux/drivers/tty/serial/Kconfig
+===================================================================
+--- linux.orig/drivers/tty/serial/Kconfig
++++ linux/drivers/tty/serial/Kconfig
+@@ -97,6 +97,14 @@ config SERIAL_EARLYCON_RISCV_SBI
+ 	  with "earlycon=sbi" on the kernel command line. The console is
+ 	  enabled when early_param is processed.
+ 
++config SERIAL_EARLYCON_SIMPLE_UART
++	bool "Early console for simple uart"
++	select SERIAL_CORE
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	help
++	  Support for early debug console using simple uart.
++
+ config SERIAL_SB1250_DUART
+ 	tristate "BCM1xxx on-chip DUART serial support"
+ 	depends on SIBYTE_SB1xxx_SOC=y
+@@ -1361,6 +1369,20 @@ config SERIAL_ARC_NR_PORTS
+ 	  Set this to the number of serial ports you want the driver
+ 	  to support.
+ 
++config SIMPLE_UART
++	tristate "SIMPLE UART driver support"
++	select SERIAL_CORE
++	help
++	  Simple Uart Driver
++
++config SIMPLE_UART_CONSOLE
++	bool "Console on SIMPLE UART"
++	depends on SIMPLE_UART=y
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	help
++	  Enable system Console on SIMPLE UART
++
+ config SERIAL_RP2
+ 	tristate "Comtrol RocketPort EXPRESS/INFINITY support"
+ 	depends on PCI
+Index: linux/drivers/tty/serial/earlycon-simple-uart.c
+===================================================================
+--- /dev/null
++++ linux/drivers/tty/serial/earlycon-simple-uart.c
+@@ -0,0 +1,32 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Earlycon for a simple (emulated) uart 
++ *
++ * Copyright (C) 2021 Franz Flasch <franzflasch@gmx.at>
++ */
++#include <linux/kernel.h>
++#include <linux/console.h>
++#include <linux/init.h>
++#include <linux/serial_core.h>
++
++#define SIMPLE_UART_TX_RX_REG 0
++
++static void simple_uart_putc(struct uart_port *port, int c)
++{
++	writeb(c, port->membase + SIMPLE_UART_TX_RX_REG);
++}
++
++static void simple_uart_console_write(struct console *con,
++			      const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++	uart_console_write(&dev->port, s, n, simple_uart_putc);
++}
++
++static int __init early_simple_uart_setup(struct earlycon_device *device,
++				  const char *opt)
++{
++	device->con->write = simple_uart_console_write;
++	return 0;
++}
++EARLYCON_DECLARE(simple_uart, early_simple_uart_setup);
+Index: linux/drivers/tty/serial/simple-uart.c
+===================================================================
+--- /dev/null
++++ linux/drivers/tty/serial/simple-uart.c
+@@ -0,0 +1,615 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Simple Uart Console driver
++ *
++ * Copyright 2021 Franz Flasch.
++ *
++ * Copyright (c) 2021 Franz Flasch
++ */
++
++#include <linux/module.h>
++#include <linux/serial.h>
++#include <linux/console.h>
++#include <linux/sysrq.h>
++#include <linux/platform_device.h>
++#include <linux/tty.h>
++#include <linux/tty_flip.h>
++#include <linux/serial_core.h>
++#include <linux/io.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++
++#define SIMPLE_UART_DEV_NAME	"ttySU"
++#define DRIVER_NAME	"simple-uart"
++#define CONFIG_SIMPLE_UART_NR_PORTS 1
++
++#define SIMPLE_UART_TX_RX_REG 0
++#define SIMPLE_UART_STATUS_REG 1
++
++#define RXEMPTY (1<<0)
++#define RXIENB  (1<<1)
++#define TXEMPTY (1<<2)
++#define TXIENB  (1<<3)
++
++struct simple_uart_port {
++	struct uart_port port;
++};
++
++static struct simple_uart_port simple_uart_ports[CONFIG_SIMPLE_UART_NR_PORTS];
++
++#ifdef CONFIG_SIMPLE_UART_CONSOLE
++static struct console simple_uart_console;
++#endif
++
++static struct uart_driver simple_uart_driver = {
++	.owner		= THIS_MODULE,
++	.driver_name	= DRIVER_NAME,
++	.dev_name	= SIMPLE_UART_DEV_NAME,
++	.major		= 0,
++	.minor		= 0,
++	.nr		= CONFIG_SIMPLE_UART_NR_PORTS,
++#ifdef CONFIG_SIMPLE_UART_CONSOLE
++	.cons		= &simple_uart_console,
++#endif
++};
++
++static inline void simple_uart_reg_write(struct uart_port *port, u32 val, unsigned int off)
++{
++	writeb(val, port->membase + off);
++}
++
++static inline u32 simple_uart_reg_read(struct uart_port *port, unsigned int off)
++{
++	return readb(port->membase + off);
++}
++
++static inline void simple_uart_disable_tx_irq(struct uart_port *port)
++{
++    unsigned int status;
++    status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG);
++    status &= ~TXIENB;
++    simple_uart_reg_write(port, status, SIMPLE_UART_STATUS_REG);
++}
++
++static inline void simple_uart_disable_rx_irq(struct uart_port *port)
++{
++    unsigned int status;
++    status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG);
++    status &= ~RXIENB;
++    simple_uart_reg_write(port, status, SIMPLE_UART_STATUS_REG);
++}
++
++static inline void simple_uart_enable_tx_irq(struct uart_port *port)
++{
++    unsigned int status;
++    status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG);
++    status |= TXIENB;
++    simple_uart_reg_write(port, status, SIMPLE_UART_STATUS_REG);
++}
++
++static inline void simple_uart_enable_rx_irq(struct uart_port *port)
++{
++    unsigned int status;
++    status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG);
++    status |= RXIENB;
++    simple_uart_reg_write(port, status, SIMPLE_UART_STATUS_REG);
++}
++
++static void simple_uart_stop_rx(struct uart_port *port)
++{
++    // UART_RX_IRQ_DISABLE(port);
++    simple_uart_disable_rx_irq(port);
++}
++
++static void simple_uart_stop_tx(struct uart_port *port)
++{
++	// UART_TX_IRQ_DISABLE(port);
++    simple_uart_disable_tx_irq(port);
++}
++
++/*
++ * Return TIOCSER_TEMT when transmitter is not busy.
++ */
++static unsigned int simple_uart_tx_empty(struct uart_port *port)
++{
++	unsigned int stat;
++
++	stat = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG);
++	if (stat & TXEMPTY)
++		return TIOCSER_TEMT;
++
++	return 0;
++}
++
++/*
++ * Driver internal routine, used by both tty(serial core) as well as tx-isr
++ *  -Called under spinlock in either cases
++ *  -also tty->stopped has already been checked
++ *     = by uart_start( ) before calling us
++ *     = tx_ist checks that too before calling
++ */
++static void simple_uart_tx_chars(struct uart_port *port)
++{
++	struct circ_buf *xmit = &port->state->xmit;
++	int sent = 0;
++	unsigned char ch;
++
++	if (unlikely(port->x_char)) {
++		simple_uart_reg_write(port, port->x_char, SIMPLE_UART_TX_RX_REG);
++		port->icount.tx++;
++		port->x_char = 0;
++		sent = 1;
++	} else if (!uart_circ_empty(xmit)) {
++		ch = xmit->buf[xmit->tail];
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		port->icount.tx++;
++		while (!(simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & TXEMPTY))
++			cpu_relax();
++        simple_uart_reg_write(port, ch, SIMPLE_UART_TX_RX_REG);
++		sent = 1;
++	}
++
++	/*
++	 * If num chars in xmit buffer are too few, ask tty layer for more.
++	 * By Hard ISR to schedule processing in software interrupt part
++	 */
++	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++		uart_write_wakeup(port);
++
++	if (sent)
++        simple_uart_enable_tx_irq(port);
++	 	// UART_TX_IRQ_ENABLE(port);
++}
++
++/*
++ * port is locked and interrupts are disabled
++ * uart_start( ) calls us under the port spinlock irqsave
++ */
++static void simple_uart_start_tx(struct uart_port *port)
++{
++	simple_uart_tx_chars(port);
++}
++
++static void simple_uart_rx_chars(struct uart_port *port, unsigned int status)
++{
++	unsigned int ch = 0;
++
++	/*
++	 * UART has 4 deep RX-FIFO. Driver's recongnition of this fact
++	 * is very subtle. Here's how ...
++	 * Upon getting a RX-Intr, such that RX-EMPTY=0, meaning data available,
++	 * driver reads the DATA Reg and keeps doing that in a loop, until
++	 * RX-EMPTY=1. Multiple chars being avail, with a single Interrupt,
++	 * before RX-EMPTY=0, implies some sort of buffering going on in the
++	 * controller, which is indeed the Rx-FIFO.
++	 */
++	do {
++		if (status & RXEMPTY)
++			continue;
++
++        ch = simple_uart_reg_read(port, SIMPLE_UART_TX_RX_REG);
++		port->icount.rx++;
++
++		if (!(uart_handle_sysrq_char(port, ch)))
++			uart_insert_char(port, status, 0, ch, TTY_NORMAL);
++
++		spin_unlock(&port->lock);
++		tty_flip_buffer_push(&port->state->port);
++		spin_lock(&port->lock);
++	} while (!((status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG)) & RXEMPTY));
++}
++
++/*
++ * A note on the Interrupt handling state machine of this driver
++ *
++ * kernel printk writes funnel thru the console driver framework and in order
++ * to keep things simple as well as efficient, it writes to UART in polled
++ * mode, in one shot, and exits.
++ *
++ * OTOH, Userland output (via tty layer), uses interrupt based writes as there
++ * can be undeterministic delay between char writes.
++ *
++ * Thus Rx-interrupts are always enabled, while tx-interrupts are by default
++ * disabled.
++ *
++ * When tty has some data to send out, serial core calls driver's start_tx
++ * which
++ *   -checks-if-tty-buffer-has-char-to-send
++ *   -writes-data-to-uart
++ *   -enable-tx-intr
++ *
++ * Once data bits are pushed out, controller raises the Tx-room-avail-Interrupt.
++ * The first thing Tx ISR does is disable further Tx interrupts (as this could
++ * be the last char to send, before settling down into the quiet polled mode).
++ * It then calls the exact routine used by tty layer write to send out any
++ * more char in tty buffer. In case of sending, it re-enables Tx-intr. In case
++ * of no data, it remains disabled.
++ * This is how the transmit state machine is dynamically switched on/off
++ */
++
++static irqreturn_t simple_uart_isr(int irq, void *dev_id)
++{
++//	static int i = 0;
++	struct uart_port *port = dev_id;
++	unsigned int status;
++
++	status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG);
++
++	// if(i%10 == 0)
++    // 	printk("IRQ! %d status %x\n", i, status);
++
++	// i++;
++
++    // dump_stack();
++
++	/*
++	 * Single IRQ for both Rx (data available) Tx (room available) Interrupt
++	 * notifications from the UART Controller.
++	 * To demultiplex between the two, we check the relevant bits
++	 */
++	if (status & RXIENB) {
++
++		/* already in ISR, no need of xx_irqsave */
++		spin_lock(&port->lock);
++		simple_uart_rx_chars(port, status);
++		spin_unlock(&port->lock);
++	}
++
++	if ((status & TXIENB) && (status & TXEMPTY)) {
++
++		/* Unconditionally disable further Tx-Interrupts.
++		 * will be enabled by tx_chars() if needed.
++		 */
++		// UART_TX_IRQ_DISABLE(port);
++        simple_uart_disable_tx_irq(port);
++
++        spin_lock(&port->lock);
++
++        if (!uart_tx_stopped(port))
++        {
++            simple_uart_tx_chars(port);
++        }
++
++        spin_unlock(&port->lock);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static unsigned int simple_uart_get_mctrl(struct uart_port *port)
++{
++	/*
++	 * Pretend we have a Modem status reg and following bits are
++	 *  always set, to satify the serial core state machine
++	 *  (DSR) Data Set Ready
++	 *  (CTS) Clear To Send
++	 *  (CAR) Carrier Detect
++	 */
++	return TIOCM_CTS | TIOCM_DSR | TIOCM_CD;
++}
++
++static void simple_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
++{
++	/* MCR not present */
++}
++
++static void simple_uart_break_ctl(struct uart_port *port, int break_state)
++{
++	/* ARC UART doesn't support sending Break signal */
++}
++
++static int simple_uart_startup(struct uart_port *port)
++{
++	/* Before we hook up the ISR, Disable all UART Interrupts */
++	// UART_ALL_IRQ_DISABLE(port);
++    simple_uart_disable_tx_irq(port);
++    simple_uart_disable_rx_irq(port);
++
++	if (request_irq(port->irq, simple_uart_isr, 0, "simple uart rx", port)) {
++		dev_warn(port->dev, "Unable to attach SIMPLE UART intr\n");
++		return -EBUSY;
++	}
++
++	// UART_RX_IRQ_ENABLE(port); /* Only Rx IRQ enabled to begin with */
++    simple_uart_enable_rx_irq(port);
++
++	return 0;
++}
++
++/* This is not really needed */
++static void simple_uart_shutdown(struct uart_port *port)
++{
++	free_irq(port->irq, port);
++}
++
++static void
++simple_uart_set_termios(struct uart_port *port, struct ktermios *new,
++		       struct ktermios *old)
++{
++	unsigned long flags;
++    unsigned int baud;
++
++    baud = uart_get_baud_rate(port, new, old, 0, 460800);
++
++	spin_lock_irqsave(&port->lock, flags);
++
++	// UART_ALL_IRQ_DISABLE(port);
++    simple_uart_disable_tx_irq(port);
++    simple_uart_disable_rx_irq(port);
++
++    // /* do something here */
++
++	// UART_RX_IRQ_ENABLE(port);
++    simple_uart_enable_rx_irq(port);
++
++	/*
++	 * UART doesn't support Parity/Hardware Flow Control;
++	 * Only supports 8N1 character size
++	 */
++	new->c_cflag &= ~(CMSPAR|CRTSCTS|CSIZE);
++	new->c_cflag |= CS8;
++
++	if (old)
++		tty_termios_copy_hw(new, old);
++
++	/* Don't rewrite B0 */
++	if (tty_termios_baud_rate(new))
++		tty_termios_encode_baud_rate(new, baud, baud);
++
++	uart_update_timeout(port, new->c_cflag, baud);
++
++	spin_unlock_irqrestore(&port->lock, flags);
++}
++
++static const char *simple_uart_type(struct uart_port *port)
++{
++	return port->type == PORT_ARC ? DRIVER_NAME : NULL;
++}
++
++static void simple_uart_release_port(struct uart_port *port)
++{
++}
++
++static int simple_uart_request_port(struct uart_port *port)
++{
++	return 0;
++}
++
++/*
++ * Verify the new serial_struct (for TIOCSSERIAL).
++ */
++static int
++simple_uart_verify_port(struct uart_port *port, struct serial_struct *ser)
++{
++	if (port->type != PORT_UNKNOWN && ser->type != PORT_ARC)
++		return -EINVAL;
++
++	return 0;
++}
++
++/*
++ * Configure/autoconfigure the port.
++ */
++static void simple_uart_config_port(struct uart_port *port, int flags)
++{
++	if (flags & UART_CONFIG_TYPE)
++		port->type = PORT_ARC;
++}
++
++#ifdef CONFIG_CONSOLE_POLL
++
++static void simple_uart_poll_putchar(struct uart_port *port, unsigned char chr)
++{
++	simple_uart_reg_write(port, chr, SIMPLE_UART_TX_RX_REG);
++}
++
++static int simple_uart_poll_getchar(struct uart_port *port)
++{
++	unsigned char chr;
++
++	while (!(simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & RXEMPTY))
++		cpu_relax();
++
++	chr = simple_uart_reg_read(port, SIMPLE_UART_TX_RX_REG);
++	return chr;
++}
++#endif
++
++static const struct uart_ops simple_uart_pops = {
++	.tx_empty	= simple_uart_tx_empty,
++	.set_mctrl	= simple_uart_set_mctrl,
++	.get_mctrl	= simple_uart_get_mctrl,
++	.stop_tx	= simple_uart_stop_tx,
++	.start_tx	= simple_uart_start_tx,
++	.stop_rx	= simple_uart_stop_rx,
++	.break_ctl	= simple_uart_break_ctl,
++	.startup	= simple_uart_startup,
++	.shutdown	= simple_uart_shutdown,
++	.set_termios	= simple_uart_set_termios,
++	.type		= simple_uart_type,
++	.release_port	= simple_uart_release_port,
++	.request_port	= simple_uart_request_port,
++	.config_port	= simple_uart_config_port,
++	.verify_port	= simple_uart_verify_port,
++#ifdef CONFIG_CONSOLE_POLL
++	.poll_put_char = simple_uart_poll_putchar,
++	.poll_get_char = simple_uart_poll_getchar,
++#endif
++};
++
++#ifdef CONFIG_SIMPLE_UART_CONSOLE
++
++static int simple_uart_console_setup(struct console *co, char *options)
++{
++	struct uart_port *port;
++	int baud = 115200;
++	int bits = 8;
++	int parity = 'n';
++	int flow = 'n';
++
++	if (co->index < 0 || co->index >= CONFIG_SIMPLE_UART_NR_PORTS)
++		return -ENODEV;
++
++	/*
++	 * The uart port backing the console (e.g. ttyARC1) might not have been
++	 * init yet. If so, defer the console setup to after the port.
++	 */
++	port = &simple_uart_ports[co->index].port;
++	if (!port->membase)
++		return -ENODEV;
++
++	if (options)
++		uart_parse_options(options, &baud, &parity, &bits, &flow);
++
++	/*
++	 * Serial core will call port->ops->set_termios( )
++	 * which will set the baud reg
++	 */
++	return uart_set_options(port, co, baud, parity, bits, flow);
++}
++
++static void simple_uart_console_putchar(struct uart_port *port, int ch)
++{
++    while (!(simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & TXEMPTY))
++        cpu_relax();
++    simple_uart_reg_write(port, (unsigned char)ch, SIMPLE_UART_TX_RX_REG);
++}
++
++/*
++ * Interrupts are disabled on entering
++ */
++static void simple_uart_console_write(struct console *co, const char *s,
++				     unsigned int count)
++{
++	struct uart_port *port = &simple_uart_ports[co->index].port;
++	unsigned long flags;
++
++	spin_lock_irqsave(&port->lock, flags);
++	uart_console_write(port, s, count, simple_uart_console_putchar);
++	spin_unlock_irqrestore(&port->lock, flags);
++}
++
++static struct console simple_uart_console = {
++	.name	= SIMPLE_UART_DEV_NAME,
++	.write	= simple_uart_console_write,
++	.device	= uart_console_device,
++	.setup	= simple_uart_console_setup,
++	.flags	= CON_PRINTBUFFER,
++	.index	= -1,
++	.data	= &simple_uart_driver
++};
++
++#endif	/* CONFIG_SIMPLE_UART_CONSOLE */
++
++static int simple_uart_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct simple_uart_port *uart;
++	struct uart_port *port;
++    struct resource *res_mem;
++	int dev_id;
++	u32 val;
++
++	/* no device tree device */
++	if (!np)
++		return -ENODEV;
++
++	dev_id = of_alias_get_id(np, "serial");
++	if (dev_id < 0)
++		dev_id = 0;
++
++	if (dev_id >= ARRAY_SIZE(simple_uart_ports)) {
++		dev_err(&pdev->dev, "serial%d out of range\n", dev_id);
++		return -EINVAL;
++	}
++
++	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res_mem) {
++		dev_err(&pdev->dev, "could not get mem\n");
++		return -ENODEV;
++	}
++
++	uart = &simple_uart_ports[dev_id];
++	port = &uart->port;
++
++	if (of_property_read_u32(np, "clock-frequency", &val)) {
++		dev_err(&pdev->dev, "clock-frequency property NOTset\n");
++		return -EINVAL;
++	}
++	port->uartclk = val;
++
++	port->membase = of_iomap(np, 0);
++    // printk("simple_uart_probe %x\n", (u32)port->membase);
++	if (!port->membase)
++		/* No point of dev_err since UART itself is hosed here */
++		return -ENXIO;
++
++	port->irq = irq_of_parse_and_map(np, 0);
++    port->mapbase = res_mem->start;
++	port->dev = &pdev->dev;
++	port->iotype = UPIO_MEM;
++	port->flags = UPF_BOOT_AUTOCONF;
++	port->line = dev_id;
++	port->ops = &simple_uart_pops;
++	port->has_sysrq = IS_ENABLED(CONFIG_SIMPLE_UART_CONSOLE);
++
++	port->fifosize = 1;
++
++	/*
++	 * uart_insert_char( ) uses it in decideding whether to ignore a
++	 * char or not. Explicitly setting it here, removes the subtelty
++	 */
++	port->ignore_status_mask = 0;
++
++	return uart_add_one_port(&simple_uart_driver, &simple_uart_ports[dev_id].port);
++}
++
++static int simple_uart_remove(struct platform_device *pdev)
++{
++	/* This will never be called */
++	return 0;
++}
++
++static const struct of_device_id simple_uart_dt_ids[] = {
++	{ .compatible = "simple-uart" },
++	{ /* Sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, simple_uart_dt_ids);
++
++static struct platform_driver simple_uart_platform_driver = {
++	.probe = simple_uart_probe,
++	.remove = simple_uart_remove,
++	.driver = {
++		.name = DRIVER_NAME,
++		.of_match_table  = simple_uart_dt_ids,
++	 },
++};
++
++static int __init simple_uart_init(void)
++{
++	int ret;
++
++	ret = uart_register_driver(&simple_uart_driver);
++	if (ret)
++		return ret;
++
++	ret = platform_driver_register(&simple_uart_platform_driver);
++	if (ret)
++		uart_unregister_driver(&simple_uart_driver);
++
++	return ret;
++}
++
++static void __exit simple_uart_exit(void)
++{
++	platform_driver_unregister(&simple_uart_platform_driver);
++	uart_unregister_driver(&simple_uart_driver);
++}
++
++module_init(simple_uart_init);
++module_exit(simple_uart_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:" DRIVER_NAME);
++MODULE_AUTHOR("Franz Flasch");
++MODULE_DESCRIPTION("Uart Driver to be used in an emulated HW");

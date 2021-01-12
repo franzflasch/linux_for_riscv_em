@@ -1,0 +1,25 @@
+From cb264da1a745f0a4737b85f0fe544e4e84c23652 Mon Sep 17 00:00:00 2001
+From: Franz Flasch <franz.flasch@gmx.at>
+Date: Tue, 12 Jan 2021 14:33:53 +0000
+Subject: [PATCH 2/6] Toolchain fix
+
+---
+ package/Makefile.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/Makefile.in b/package/Makefile.in
+index 51f5cbc..dd04124 100644
+--- a/package/Makefile.in
++++ b/package/Makefile.in
+@@ -41,7 +41,7 @@ GNU_TARGET_NAME = $(ARCH)-$(TARGET_VENDOR)-$(TARGET_OS)-$(LIBC)$(ABI)
+ 
+ # FLAT binary format needs uclinux
+ ifeq ($(BR2_BINFMT_FLAT),y)
+-TARGET_OS = uclinux
++TARGET_OS = linux
+ else
+ TARGET_OS = linux
+ endif
+-- 
+2.25.1
+

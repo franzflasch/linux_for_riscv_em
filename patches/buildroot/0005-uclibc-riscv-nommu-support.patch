@@ -1,0 +1,35 @@
+From a1b4fbccd1ece12ca70224bee42deb9da06a078d Mon Sep 17 00:00:00 2001
+From: Franz Flasch <franz.flasch@gmx.at>
+Date: Tue, 12 Jan 2021 14:36:41 +0000
+Subject: [PATCH 5/6] uclibc riscv nommu support
+
+---
+ .../uclibc/0005-riscv-clear-a3-a4-in-crt1.patch  | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 package/uclibc/0005-riscv-clear-a3-a4-in-crt1.patch
+
+diff --git a/package/uclibc/0005-riscv-clear-a3-a4-in-crt1.patch b/package/uclibc/0005-riscv-clear-a3-a4-in-crt1.patch
+new file mode 100644
+index 0000000..904617d
+--- /dev/null
++++ b/package/uclibc/0005-riscv-clear-a3-a4-in-crt1.patch
+@@ -0,0 +1,16 @@
++Index: uclibc-1.0.36/libc/sysdeps/linux/riscv64/crt1.S
++===================================================================
++--- uclibc-1.0.36.orig/libc/sysdeps/linux/riscv64/crt1.S
+++++ uclibc-1.0.36/libc/sysdeps/linux/riscv64/crt1.S
++@@ -55,6 +55,11 @@ _start:
++ 	la   a0, main
++ 	REG_L a1, 0(sp)      /* argc.  */
++ 	addi  a2, sp, SZREG  /* argv.  */
+++	/*
+++	 * No support fo app_init/app_fini as we don't support shared libraries.
+++	 */
+++	mv    a3, zero
+++	mv    a4, zero
++ 	andi  sp, sp, ALMASK /* Align stack. */
++ 	lla   a3, _init
++ 	lla   a4, _fini
+-- 
+2.25.1
+
