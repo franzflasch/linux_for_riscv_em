@@ -1,0 +1,203 @@
+From e7343c214008eb5fdb4c7972b207be06383664fd Mon Sep 17 00:00:00 2001
+From: Franz Flasch <franz.flasch@gmx.at>
+Date: Mon, 26 Apr 2021 11:37:35 +0000
+Subject: [PATCH] add simple uart
+
+---
+ include/sbi_utils/fdt/fdt_helper.h        |  3 ++
+ include/sbi_utils/serial/simple-uart.h    | 22 +++++++++++++
+ lib/utils/fdt/fdt_helper.c                | 17 ++++++++++
+ lib/utils/serial/fdt_serial.c             |  2 ++
+ lib/utils/serial/fdt_serial_simple_uart.c | 38 +++++++++++++++++++++++
+ lib/utils/serial/objects.mk               |  2 ++
+ lib/utils/serial/simple-uart.c            | 30 ++++++++++++++++++
+ 7 files changed, 114 insertions(+)
+ create mode 100644 include/sbi_utils/serial/simple-uart.h
+ create mode 100644 lib/utils/serial/fdt_serial_simple_uart.c
+ create mode 100644 lib/utils/serial/simple-uart.c
+
+diff --git a/include/sbi_utils/fdt/fdt_helper.h b/include/sbi_utils/fdt/fdt_helper.h
+index f5222de..cb97d88 100644
+--- a/include/sbi_utils/fdt/fdt_helper.h
++++ b/include/sbi_utils/fdt/fdt_helper.h
+@@ -51,6 +51,9 @@ int fdt_parse_uart8250_node(void *fdt, int nodeoffset,
+ int fdt_parse_uart8250(void *fdt, struct platform_uart_data *uart,
+ 		       const char *compatible);
+ 
++int fdt_parse_simple_uart_node(void *fdt, int nodeoffset,
++			    struct platform_uart_data *uart);
++
+ struct plic_data;
+ 
+ int fdt_parse_plic_node(void *fdt, int nodeoffset, struct plic_data *plic);
+diff --git a/include/sbi_utils/serial/simple-uart.h b/include/sbi_utils/serial/simple-uart.h
+new file mode 100644
+index 0000000..d92647e
+--- /dev/null
++++ b/include/sbi_utils/serial/simple-uart.h
+@@ -0,0 +1,22 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ *
++ * Copyright (c) 2019 Western Digital Corporation or its affiliates.
++ *
++ * Authors:
++ *   Anup Patel <anup.patel@wdc.com>
++ */
++
++#ifndef __SERIAL_SIMPLE_UART_H__
++#define __SERIAL_SIMPLE_UART_H__
++
++#include <sbi/sbi_types.h>
++
++void simple_uart_putc(char ch);
++
++int simple_uart_getc(void);
++
++int simple_uart_init(unsigned long base, u32 in_freq, u32 baudrate, u32 reg_shift,
++		  u32 reg_width);
++
++#endif
+diff --git a/lib/utils/fdt/fdt_helper.c b/lib/utils/fdt/fdt_helper.c
+index bf19ff9..266a508 100644
+--- a/lib/utils/fdt/fdt_helper.c
++++ b/lib/utils/fdt/fdt_helper.c
+@@ -346,6 +346,23 @@ int fdt_parse_uart8250(void *fdt, struct platform_uart_data *uart,
+ 	return fdt_parse_uart8250_node(fdt, nodeoffset, uart);
+ }
+ 
++int fdt_parse_simple_uart_node(void *fdt, int nodeoffset,
++			    			   struct platform_uart_data *uart)
++{
++	int rc;
++	unsigned long reg_addr, reg_size;
++
++	if (nodeoffset < 0 || !uart || !fdt)
++		return SBI_ENODEV;
++
++	rc = fdt_get_node_addr_size(fdt, nodeoffset, &reg_addr, &reg_size);
++	if (rc < 0 || !reg_addr || !reg_size)
++		return SBI_ENODEV;
++	uart->addr = reg_addr;
++
++	return 0;
++}
++
+ int fdt_parse_plic_node(void *fdt, int nodeoffset, struct plic_data *plic)
+ {
+ 	int len, rc;
+diff --git a/lib/utils/serial/fdt_serial.c b/lib/utils/serial/fdt_serial.c
+index b9ce67e..c9ecfdb 100644
+--- a/lib/utils/serial/fdt_serial.c
++++ b/lib/utils/serial/fdt_serial.c
+@@ -16,12 +16,14 @@ extern struct fdt_serial fdt_serial_uart8250;
+ extern struct fdt_serial fdt_serial_sifive;
+ extern struct fdt_serial fdt_serial_htif;
+ extern struct fdt_serial fdt_serial_shakti;
++extern struct fdt_serial fdt_serial_simple_uart;
+ 
+ static struct fdt_serial *serial_drivers[] = {
+ 	&fdt_serial_uart8250,
+ 	&fdt_serial_sifive,
+ 	&fdt_serial_htif,
+ 	&fdt_serial_shakti,
++	&fdt_serial_simple_uart,
+ };
+ 
+ static void dummy_putc(char ch)
+diff --git a/lib/utils/serial/fdt_serial_simple_uart.c b/lib/utils/serial/fdt_serial_simple_uart.c
+new file mode 100644
+index 0000000..75bee36
+--- /dev/null
++++ b/lib/utils/serial/fdt_serial_simple_uart.c
+@@ -0,0 +1,38 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ *
++ * Copyright (c) 2020 Western Digital Corporation or its affiliates.
++ *
++ * Authors:
++ *   Anup Patel <anup.patel@wdc.com>
++ */
++
++#include <sbi_utils/fdt/fdt_helper.h>
++#include <sbi_utils/serial/fdt_serial.h>
++#include <sbi_utils/serial/simple-uart.h>
++
++static int serial_simple_uart_init(void *fdt, int nodeoff,
++				const struct fdt_match *match)
++{
++	int rc;
++	struct platform_uart_data uart;
++
++	rc = fdt_parse_simple_uart_node(fdt, nodeoff, &uart);
++	if (rc)
++		return rc;
++
++	return simple_uart_init(uart.addr, uart.freq, uart.baud,
++			     uart.reg_shift, uart.reg_io_width);
++}
++
++static const struct fdt_match serial_simple_uart_match[] = {
++	{ .compatible = "simple-uart" },
++	{ },
++};
++
++struct fdt_serial fdt_serial_simple_uart = {
++	.match_table = serial_simple_uart_match,
++	.init = serial_simple_uart_init,
++	.getc = simple_uart_getc,
++	.putc = simple_uart_putc
++};
+diff --git a/lib/utils/serial/objects.mk b/lib/utils/serial/objects.mk
+index c0746f0..702c78c 100644
+--- a/lib/utils/serial/objects.mk
++++ b/lib/utils/serial/objects.mk
+@@ -12,6 +12,8 @@ libsbiutils-objs-y += serial/fdt_serial_htif.o
+ libsbiutils-objs-y += serial/fdt_serial_shakti.o
+ libsbiutils-objs-y += serial/fdt_serial_sifive.o
+ libsbiutils-objs-y += serial/fdt_serial_uart8250.o
++libsbiutils-objs-y += serial/fdt_serial_simple_uart.o
+ libsbiutils-objs-y += serial/shakti-uart.o
+ libsbiutils-objs-y += serial/sifive-uart.o
+ libsbiutils-objs-y += serial/uart8250.o
++libsbiutils-objs-y += serial/simple-uart.o
+diff --git a/lib/utils/serial/simple-uart.c b/lib/utils/serial/simple-uart.c
+new file mode 100644
+index 0000000..bd90a9d
+--- /dev/null
++++ b/lib/utils/serial/simple-uart.c
+@@ -0,0 +1,30 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ *
++ * Copyright (c) 2019 Western Digital Corporation or its affiliates.
++ *
++ * Authors:
++ *   Anup Patel <anup.patel@wdc.com>
++ */
++
++#include <sbi/riscv_io.h>
++#include <sbi_utils/serial/simple-uart.h>
++
++static volatile void *simple_uart_base;
++
++void simple_uart_putc(char ch)
++{
++	writeb(ch, simple_uart_base);
++}
++
++int simple_uart_getc(void)
++{
++	return readb(simple_uart_base);
++}
++
++int simple_uart_init(unsigned long base, u32 in_freq, u32 baudrate, u32 reg_shift,
++		  u32 reg_width)
++{
++	simple_uart_base      = (volatile void *)base;
++	return 0;
++}
+-- 
+2.25.1
+
