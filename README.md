@@ -5,7 +5,7 @@ This was tested in ubuntu 20.04
 
 # Howto
 1. Install my latest prebuilt riscv64 baremetal toolchain from here (the download can take a while to react, as the zip file is generated on the go):  
-https://nightly.link/franzflasch/gcc-build-tools
+https://github.com/franzflasch/gcc-build-tools
 
 And add its bin folder to $PATH  
 
