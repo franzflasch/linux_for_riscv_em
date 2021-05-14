@@ -4,8 +4,8 @@ Scripts to automate building linux images for my emulator riscv_em
 This was tested in ubuntu 20.04  
 
 # Howto
-1. Install my latest riscv64 baremetal toolchain from here (the download can take a while to react, as the zip file is generated on the go):  
-https://nightly.link/franzflasch/build-tools-gcc/workflows/riscv64-baremetal/master/toolchain_built_from_tar.zip
+1. Install my latest prebuilt riscv64 baremetal toolchain from here (the download can take a while to react, as the zip file is generated on the go):  
+https://nightly.link/franzflasch/gcc-build-tools
 
 And add its bin folder to $PATH  
 
