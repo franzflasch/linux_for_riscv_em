@@ -5,7 +5,7 @@ This was tested in ubuntu 20.04
 
 ## Howto RISCV64 (NOMMU build)
 1. Install my latest riscv64 baremetal toolchain from here (the download can take a while to react, as the zip file is generated on the go):  
-https://nightly.link/franzflasch/build-tools-gcc/workflows/riscv64-baremetal/master/toolchain_built_from_tar.zip
+https://nightly.link/franzflasch/gcc-build-tools/workflows/riscv64-baremetal/main/toolchain_built_from_tar
 
 And add its bin folder to $PATH  
 
@@ -27,7 +27,7 @@ output/linux/loader_64.bin
 
 ## Howto RISCV32 (MMU build)
 1. Install my latest riscv32 toolchain from here (the download can take a while to react, as the zip file is generated on the go):  
-https://nightly.link/franzflasch/build-tools-gcc/workflows/riscv32/master/toolchain_built_from_tar.zip
+https://nightly.link/franzflasch/gcc-build-tools/workflows/riscv32-baremetal/main/toolchain_built_from_tar
 
 And add its bin folder to $PATH  
 
