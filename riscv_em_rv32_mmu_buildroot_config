@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Buildroot 2021.02.1 Configuration
+# Buildroot -g6d502ac-dirty Configuration
 #
 BR2_HAVE_DOT_CONFIG=y
 BR2_HOST_GCC_AT_LEAST_4_9=y
@@ -133,6 +133,7 @@ BR2_COMPILER_PARANOID_UNSAFE_PATH=y
 #
 # Security Hardening Options
 #
+BR2_PIC_PIE_ARCH_SUPPORTS=y
 # BR2_PIC_PIE is not set
 BR2_SSP_NONE=y
 # BR2_SSP_REGULAR is not set
@@ -141,6 +142,7 @@ BR2_SSP_NONE=y
 BR2_RELRO_NONE=y
 # BR2_RELRO_PARTIAL is not set
 # BR2_RELRO_FULL is not set
+BR2_FORTIFY_SOURCE_ARCH_SUPPORTS=y
 BR2_FORTIFY_SOURCE_NONE=y
 # BR2_FORTIFY_SOURCE_1 is not set
 # BR2_FORTIFY_SOURCE_2 is not set
@@ -170,7 +172,7 @@ BR2_KERNEL_HEADERS_5_10=y
 # BR2_KERNEL_HEADERS_CUSTOM_TARBALL is not set
 # BR2_KERNEL_HEADERS_CUSTOM_GIT is not set
 BR2_KERNEL_HEADERS_LATEST=y
-BR2_DEFAULT_KERNEL_HEADERS="5.10.25"
+BR2_DEFAULT_KERNEL_HEADERS="5.10.64"
 BR2_PACKAGE_LINUX_HEADERS=y
 
 #
@@ -197,7 +199,7 @@ BR2_BINUTILS_EXTRA_CONFIG_OPTIONS=""
 BR2_GCC_VERSION_9_X=y
 # BR2_GCC_VERSION_10_X is not set
 BR2_GCC_SUPPORTS_DLANG=y
-BR2_GCC_VERSION="9.3.0"
+BR2_GCC_VERSION="9.4.0"
 BR2_EXTRA_GCC_CONFIG_OPTIONS=""
 # BR2_TOOLCHAIN_BUILDROOT_CXX is not set
 # BR2_TOOLCHAIN_BUILDROOT_FORTRAN is not set
@@ -473,10 +475,6 @@ BR2_PACKAGE_PULSEAUDIO_HAS_ATOMIC=y
 #
 # v4l2loopback needs a Linux kernel to be built
 #
-
-#
-# vlc needs a toolchain w/ C++, dynamic library, wchar, threads, gcc >= 4.9, headers >= 3.7
-#
 # BR2_PACKAGE_VORBIS_TOOLS is not set
 # BR2_PACKAGE_WAVPACK is not set
 # BR2_PACKAGE_YAVTA is not set
@@ -569,6 +567,7 @@ BR2_PACKAGE_LTP_TESTSUITE_ARCH_SUPPORTS=y
 # BR2_PACKAGE_PV is not set
 # BR2_PACKAGE_RAMSMP is not set
 # BR2_PACKAGE_RAMSPEED is not set
+# BR2_PACKAGE_RT_TESTS is not set
 # BR2_PACKAGE_SPIDEV_TEST is not set
 # BR2_PACKAGE_STRESS is not set
 # BR2_PACKAGE_STRESS_NG is not set
@@ -782,10 +781,6 @@ BR2_PACKAGE_NETSURF_ARCH_SUPPORTS=y
 
 #
 # cegui needs a toolchain w/ C++, threads, dynamic library, wchar
-#
-
-#
-# directfb needs a glibc or uClibc toolchain w/ C++, NPTL, gcc >= 4.5, dynamic library
 #
 
 #
@@ -1336,7 +1331,7 @@ BR2_PACKAGE_PROVIDES_HOST_OPENSSL="host-libopenssl"
 #
 
 #
-# assimp needs a toolchain w/ C++, wchar
+# assimp needs libzlib
 #
 
 #
@@ -1498,7 +1493,7 @@ BR2_PACKAGE_PROVIDES_HOST_OPENSSL="host-libopenssl"
 #
 
 #
-# pipewire needs udev and a toolchain w/ threads
+# pipewire needs udev and a toolchain w/ threads, headers >= 3.18
 #
 # BR2_PACKAGE_PIXMAN is not set
 
@@ -1823,10 +1818,6 @@ BR2_PACKAGE_LIBCAMERA_ARCH_SUPPORTS=y
 #
 
 #
-# azmq needs a toolchain w/ C++11, wchar and NPTL
-#
-
-#
 # azure-iot-sdk-c needs a toolchain w/ C++, NPTL and wchar
 #
 
@@ -1917,7 +1908,7 @@ BR2_PACKAGE_LIBCAMERA_ARCH_SUPPORTS=y
 # BR2_PACKAGE_LIBMODBUS is not set
 
 #
-# libmodsecurity needs a toolchain w/ C++, dynamic library, threads
+# libmodsecurity needs a toolchain w/ C++, threads
 #
 # BR2_PACKAGE_LIBNATPMP is not set
 # BR2_PACKAGE_LIBNDP is not set
@@ -2202,7 +2193,7 @@ BR2_PACKAGE_LIBBSD_ARCH_SUPPORTS=y
 # BR2_PACKAGE_LIBGEE is not set
 
 #
-# libgeos needs a toolchain w/ C++, wchar
+# libgeos needs a toolchain w/ C++, wchar, not binutils bug 21464, 27597
 #
 # BR2_PACKAGE_LIBGLIB2 is not set
 # BR2_PACKAGE_LIBGLOB is not set
@@ -2902,7 +2893,6 @@ BR2_PACKAGE_URANDOM_SCRIPTS=y
 #
 # BR2_PACKAGE_CPULOAD is not set
 # BR2_PACKAGE_DAEMON is not set
-# BR2_PACKAGE_DC3DD is not set
 
 #
 # ddrescue needs a toolchain w/ C++
@@ -2942,6 +2932,7 @@ BR2_PACKAGE_INITSCRIPTS=y
 #
 # netifrc needs openrc as init system
 #
+# BR2_PACKAGE_NUMACTL is not set
 
 #
 # nut needs a toolchain w/ C++
@@ -2978,7 +2969,6 @@ BR2_PACKAGE_INITSCRIPTS=y
 # BR2_PACKAGE_SWUPDATE is not set
 BR2_PACKAGE_SYSTEMD_ARCH_SUPPORTS=y
 # BR2_PACKAGE_TPM_TOOLS is not set
-# BR2_PACKAGE_UNSCD is not set
 # BR2_PACKAGE_UTIL_LINUX is not set
 # BR2_PACKAGE_WATCHDOG is not set
 # BR2_PACKAGE_XDG_DBUS_PROXY is not set
@@ -3135,6 +3125,11 @@ BR2_PACKAGE_PROVIDES_HOST_RUSTC="host-rust-bin"
 #
 # Legacy options removed in 2021.02
 #
+# BR2_PACKAGE_GNURADIO_PAGER is not set
+# BR2_PACKAGE_SCONESERVER_HTTP_SCONESITE_IMAGE is not set
+# BR2_PACKAGE_XSERVER_XORG_SERVER_KDRIVE_EVDEV is not set
+# BR2_PACKAGE_XSERVER_XORG_SERVER_KDRIVE_KBD is not set
+# BR2_PACKAGE_XSERVER_XORG_SERVER_KDRIVE_MOUSE is not set
 # BR2_PACKAGE_MPD_AUDIOFILE is not set
 # BR2_PACKAGE_AUDIOFILE is not set
 # BR2_BINUTILS_VERSION_2_33_X is not set
