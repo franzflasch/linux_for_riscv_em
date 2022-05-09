@@ -42,6 +42,7 @@ cp ${ROOT_DIR}/patches/linux/* ${WORK_DIR}/linux-${LINUX_VERSION}/
 cd ${WORK_DIR}/linux-${LINUX_VERSION}/
 patch -p1 < 0001-add-simple-uart.patch
 patch -p1 < 0002-revert-commit-2217b982624680d19a80ebb4600d05c8586c4f96.patch
+patch -p1 < 0003-check-for-zifencei-compat.patch
 
 make ARCH=riscv CROSS_COMPILE=riscv64-none-elf- -j16 loader
 riscv64-none-elf-objcopy -O binary arch/riscv/boot/loader loader_64.bin
