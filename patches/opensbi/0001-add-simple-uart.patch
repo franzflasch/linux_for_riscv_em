@@ -1,35 +1,34 @@
-From e7343c214008eb5fdb4c7972b207be06383664fd Mon Sep 17 00:00:00 2001
+From 033489182d713653a9670335e3fcf16c65a9c8fd Mon Sep 17 00:00:00 2001
 From: Franz Flasch <franz.flasch@gmx.at>
-Date: Mon, 26 Apr 2021 11:37:35 +0000
+Date: Sat, 10 Sep 2022 06:42:07 +0000
 Subject: [PATCH] add simple uart
 
 ---
  include/sbi_utils/fdt/fdt_helper.h        |  3 ++
  include/sbi_utils/serial/simple-uart.h    | 22 +++++++++++++
  lib/utils/fdt/fdt_helper.c                | 17 ++++++++++
- lib/utils/serial/fdt_serial.c             |  2 ++
- lib/utils/serial/fdt_serial_simple_uart.c | 38 +++++++++++++++++++++++
- lib/utils/serial/objects.mk               |  2 ++
- lib/utils/serial/simple-uart.c            | 30 ++++++++++++++++++
- 7 files changed, 114 insertions(+)
+ lib/utils/serial/fdt_serial_simple_uart.c | 36 +++++++++++++++++++++
+ lib/utils/serial/objects.mk               |  4 +++
+ lib/utils/serial/simple-uart.c            | 38 +++++++++++++++++++++++
+ 6 files changed, 120 insertions(+)
  create mode 100644 include/sbi_utils/serial/simple-uart.h
  create mode 100644 lib/utils/serial/fdt_serial_simple_uart.c
  create mode 100644 lib/utils/serial/simple-uart.c
 
 diff --git a/include/sbi_utils/fdt/fdt_helper.h b/include/sbi_utils/fdt/fdt_helper.h
-index f5222de..cb97d88 100644
+index c60af35..f8db9f0 100644
 --- a/include/sbi_utils/fdt/fdt_helper.h
 +++ b/include/sbi_utils/fdt/fdt_helper.h
-@@ -51,6 +51,9 @@ int fdt_parse_uart8250_node(void *fdt, int nodeoffset,
- int fdt_parse_uart8250(void *fdt, struct platform_uart_data *uart,
- 		       const char *compatible);
+@@ -74,6 +74,9 @@ int fdt_parse_uart8250(void *fdt, struct platform_uart_data *uart,
+ int fdt_parse_xlnx_uartlite_node(void *fdt, int nodeoffset,
+ 			       struct platform_uart_data *uart);
  
 +int fdt_parse_simple_uart_node(void *fdt, int nodeoffset,
 +			    struct platform_uart_data *uart);
 +
- struct plic_data;
+ struct aplic_data;
  
- int fdt_parse_plic_node(void *fdt, int nodeoffset, struct plic_data *plic);
+ int fdt_parse_aplic_node(void *fdt, int nodeoff, struct aplic_data *aplic);
 diff --git a/include/sbi_utils/serial/simple-uart.h b/include/sbi_utils/serial/simple-uart.h
 new file mode 100644
 index 0000000..d92647e
@@ -59,23 +58,23 @@ index 0000000..d92647e
 +
 +#endif
 diff --git a/lib/utils/fdt/fdt_helper.c b/lib/utils/fdt/fdt_helper.c
-index bf19ff9..266a508 100644
+index 2bdb1ef..b4574f0 100644
 --- a/lib/utils/fdt/fdt_helper.c
 +++ b/lib/utils/fdt/fdt_helper.c
-@@ -346,6 +346,23 @@ int fdt_parse_uart8250(void *fdt, struct platform_uart_data *uart,
- 	return fdt_parse_uart8250_node(fdt, nodeoffset, uart);
+@@ -773,6 +773,23 @@ int fdt_parse_imsic_node(void *fdt, int nodeoff, struct imsic_data *imsic)
+ 	return 0;
  }
  
 +int fdt_parse_simple_uart_node(void *fdt, int nodeoffset,
 +			    			   struct platform_uart_data *uart)
 +{
 +	int rc;
-+	unsigned long reg_addr, reg_size;
++	uint64_t reg_addr, reg_size;
 +
 +	if (nodeoffset < 0 || !uart || !fdt)
 +		return SBI_ENODEV;
 +
-+	rc = fdt_get_node_addr_size(fdt, nodeoffset, &reg_addr, &reg_size);
++	rc = fdt_get_node_addr_size(fdt, nodeoffset, 0, &reg_addr, &reg_size);
 +	if (rc < 0 || !reg_addr || !reg_size)
 +		return SBI_ENODEV;
 +	uart->addr = reg_addr;
@@ -86,31 +85,12 @@ index bf19ff9..266a508 100644
  int fdt_parse_plic_node(void *fdt, int nodeoffset, struct plic_data *plic)
  {
  	int len, rc;
-diff --git a/lib/utils/serial/fdt_serial.c b/lib/utils/serial/fdt_serial.c
-index b9ce67e..c9ecfdb 100644
---- a/lib/utils/serial/fdt_serial.c
-+++ b/lib/utils/serial/fdt_serial.c
-@@ -16,12 +16,14 @@ extern struct fdt_serial fdt_serial_uart8250;
- extern struct fdt_serial fdt_serial_sifive;
- extern struct fdt_serial fdt_serial_htif;
- extern struct fdt_serial fdt_serial_shakti;
-+extern struct fdt_serial fdt_serial_simple_uart;
- 
- static struct fdt_serial *serial_drivers[] = {
- 	&fdt_serial_uart8250,
- 	&fdt_serial_sifive,
- 	&fdt_serial_htif,
- 	&fdt_serial_shakti,
-+	&fdt_serial_simple_uart,
- };
- 
- static void dummy_putc(char ch)
 diff --git a/lib/utils/serial/fdt_serial_simple_uart.c b/lib/utils/serial/fdt_serial_simple_uart.c
 new file mode 100644
-index 0000000..75bee36
+index 0000000..a63dbde
 --- /dev/null
 +++ b/lib/utils/serial/fdt_serial_simple_uart.c
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,36 @@
 +/*
 + * SPDX-License-Identifier: BSD-2-Clause
 + *
@@ -146,28 +126,31 @@ index 0000000..75bee36
 +struct fdt_serial fdt_serial_simple_uart = {
 +	.match_table = serial_simple_uart_match,
 +	.init = serial_simple_uart_init,
-+	.getc = simple_uart_getc,
-+	.putc = simple_uart_putc
 +};
 diff --git a/lib/utils/serial/objects.mk b/lib/utils/serial/objects.mk
-index c0746f0..702c78c 100644
+index d26a74e..4fdf50c 100644
 --- a/lib/utils/serial/objects.mk
 +++ b/lib/utils/serial/objects.mk
-@@ -12,6 +12,8 @@ libsbiutils-objs-y += serial/fdt_serial_htif.o
- libsbiutils-objs-y += serial/fdt_serial_shakti.o
- libsbiutils-objs-y += serial/fdt_serial_sifive.o
- libsbiutils-objs-y += serial/fdt_serial_uart8250.o
+@@ -31,9 +31,13 @@ libsbiutils-objs-y += serial/fdt_serial_uart8250.o
+ carray-fdt_serial_drivers-y += fdt_serial_xlnx_uartlite
+ libsbiutils-objs-y += serial/fdt_serial_xlnx_uartlite.o
+ 
++carray-fdt_serial_drivers-y += fdt_serial_simple_uart
 +libsbiutils-objs-y += serial/fdt_serial_simple_uart.o
++
+ libsbiutils-objs-y += serial/gaisler-uart.o
  libsbiutils-objs-y += serial/shakti-uart.o
  libsbiutils-objs-y += serial/sifive-uart.o
+ libsbiutils-objs-y += serial/litex-uart.o
  libsbiutils-objs-y += serial/uart8250.o
+ libsbiutils-objs-y += serial/xlnx-uartlite.o
 +libsbiutils-objs-y += serial/simple-uart.o
 diff --git a/lib/utils/serial/simple-uart.c b/lib/utils/serial/simple-uart.c
 new file mode 100644
-index 0000000..bd90a9d
+index 0000000..dde3968
 --- /dev/null
 +++ b/lib/utils/serial/simple-uart.c
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,38 @@
 +/*
 + * SPDX-License-Identifier: BSD-2-Clause
 + *
@@ -178,6 +161,7 @@ index 0000000..bd90a9d
 + */
 +
 +#include <sbi/riscv_io.h>
++#include <sbi/sbi_console.h>
 +#include <sbi_utils/serial/simple-uart.h>
 +
 +static volatile void *simple_uart_base;
@@ -192,10 +176,17 @@ index 0000000..bd90a9d
 +	return readb(simple_uart_base);
 +}
 +
++static struct sbi_console_device simple_uart_console = {
++	.name = "simple_uart",
++	.console_putc = simple_uart_putc,
++	.console_getc = simple_uart_getc
++};
++
 +int simple_uart_init(unsigned long base, u32 in_freq, u32 baudrate, u32 reg_shift,
 +		  u32 reg_width)
 +{
 +	simple_uart_base      = (volatile void *)base;
++	sbi_console_set_device(&simple_uart_console);
 +	return 0;
 +}
 -- 

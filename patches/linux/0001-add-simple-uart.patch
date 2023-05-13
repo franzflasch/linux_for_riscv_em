@@ -76,7 +76,7 @@ Index: linux/drivers/tty/serial/earlycon-simple-uart.c
 +
 +#define SIMPLE_UART_TX_RX_REG 0
 +
-+static void simple_uart_putc(struct uart_port *port, int c)
++static void simple_uart_putc(struct uart_port *port, unsigned char c)
 +{
 +	writeb(c, port->membase + SIMPLE_UART_TX_RX_REG);
 +}
@@ -426,7 +426,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +
 +static void
 +simple_uart_set_termios(struct uart_port *port, struct ktermios *new,
-+		       struct ktermios *old)
++		       const struct ktermios *old)
 +{
 +	unsigned long flags;
 +    unsigned int baud;
@@ -570,7 +570,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +	return uart_set_options(port, co, baud, parity, bits, flow);
 +}
 +
-+static void simple_uart_console_putchar(struct uart_port *port, int ch)
++static void simple_uart_console_putchar(struct uart_port *port, unsigned char ch)
 +{
 +    while (!(simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & TXEMPTY))
 +        cpu_relax();
