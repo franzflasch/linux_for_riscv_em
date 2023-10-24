@@ -1,0 +1,5 @@
+CFLAGS="-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64  -Os -g0  -fPIC  -Wl,-elf2flt=-r -static"
+EXTRA_LDFLAGS="  -Wl,-elf2flt=-r -static"
+
+make V=1 SKIP_STRIP=y EXTRA_LDFLAGS=" -Wl,-elf2flt=-r -static" CROSS_COMPILE=riscv64-buildroot-linux-uclibc- -j8
+
