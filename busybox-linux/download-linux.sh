@@ -2,7 +2,7 @@
 
 set -e
 
-LINUX_VERSION=6.1.28
+LINUX_VERSION=6.18.40
 
 rm -rf linux-${LINUX_VERSION}.tar.xz
 wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${LINUX_VERSION}.tar.xz

@@ -1,67 +1,6 @@
-Index: linux/drivers/tty/serial/Makefile
-===================================================================
---- linux.orig/drivers/tty/serial/Makefile
-+++ linux/drivers/tty/serial/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_SERIAL_CORE) += serial_core
- obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
- obj-$(CONFIG_SERIAL_EARLYCON_ARM_SEMIHOST) += earlycon-arm-semihost.o
- obj-$(CONFIG_SERIAL_EARLYCON_RISCV_SBI) += earlycon-riscv-sbi.o
-+obj-$(CONFIG_SERIAL_EARLYCON_SIMPLE_UART) += earlycon-simple-uart.o
- 
- # These Sparc drivers have to appear before others such as 8250
- # which share ttySx minor node space.  Otherwise console device
-@@ -76,6 +77,7 @@ obj-$(CONFIG_SERIAL_TEGRA_TCU) += tegra-
- obj-$(CONFIG_SERIAL_AR933X)   += ar933x_uart.o
- obj-$(CONFIG_SERIAL_EFM32_UART) += efm32-uart.o
- obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
-+obj-$(CONFIG_SIMPLE_UART)	+= simple-uart.o
- obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
- obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
- obj-$(CONFIG_SERIAL_FSL_LINFLEXUART)	+= fsl_linflexuart.o
-Index: linux/drivers/tty/serial/Kconfig
-===================================================================
---- linux.orig/drivers/tty/serial/Kconfig
-+++ linux/drivers/tty/serial/Kconfig
-@@ -97,6 +97,14 @@ config SERIAL_EARLYCON_RISCV_SBI
- 	  with "earlycon=sbi" on the kernel command line. The console is
- 	  enabled when early_param is processed.
- 
-+config SERIAL_EARLYCON_SIMPLE_UART
-+	bool "Early console for simple uart"
-+	select SERIAL_CORE
-+	select SERIAL_CORE_CONSOLE
-+	select SERIAL_EARLYCON
-+	help
-+	  Support for early debug console using simple uart.
-+
- config SERIAL_SB1250_DUART
- 	tristate "BCM1xxx on-chip DUART serial support"
- 	depends on SIBYTE_SB1xxx_SOC=y
-@@ -1361,6 +1369,20 @@ config SERIAL_ARC_NR_PORTS
- 	  Set this to the number of serial ports you want the driver
- 	  to support.
- 
-+config SIMPLE_UART
-+	tristate "SIMPLE UART driver support"
-+	select SERIAL_CORE
-+	help
-+	  Simple Uart Driver
-+
-+config SIMPLE_UART_CONSOLE
-+	bool "Console on SIMPLE UART"
-+	depends on SIMPLE_UART=y
-+	select SERIAL_CORE_CONSOLE
-+	select SERIAL_EARLYCON
-+	help
-+	  Enable system Console on SIMPLE UART
-+
- config SERIAL_RP2
- 	tristate "Comtrol RocketPort EXPRESS/INFINITY support"
- 	depends on PCI
-Index: linux/drivers/tty/serial/earlycon-simple-uart.c
-===================================================================
---- /dev/null
-+++ linux/drivers/tty/serial/earlycon-simple-uart.c
+diff -urN linux-6.18.40/drivers/tty/serial/earlycon-simple-uart.c linux-6.18.40_new/drivers/tty/serial/earlycon-simple-uart.c
+--- linux-6.18.40/drivers/tty/serial/earlycon-simple-uart.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-6.18.40_new/drivers/tty/serial/earlycon-simple-uart.c	2026-07-27 09:17:05.300481918 +0200
 @@ -0,0 +1,32 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
@@ -95,11 +34,68 @@ Index: linux/drivers/tty/serial/earlycon-simple-uart.c
 +	return 0;
 +}
 +EARLYCON_DECLARE(simple_uart, early_simple_uart_setup);
-Index: linux/drivers/tty/serial/simple-uart.c
-===================================================================
---- /dev/null
-+++ linux/drivers/tty/serial/simple-uart.c
-@@ -0,0 +1,615 @@
+diff -urN linux-6.18.40/drivers/tty/serial/Kconfig linux-6.18.40_new/drivers/tty/serial/Kconfig
+--- linux-6.18.40/drivers/tty/serial/Kconfig	2026-07-24 16:17:26.000000000 +0200
++++ linux-6.18.40_new/drivers/tty/serial/Kconfig	2026-07-27 09:17:05.300481918 +0200
+@@ -97,6 +97,14 @@
+ 	  with "earlycon=sbi" on the kernel command line. The console is
+ 	  enabled when early_param is processed.
+ 
++config SERIAL_EARLYCON_SIMPLE_UART
++	bool "Early console for simple uart"
++	select SERIAL_CORE
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	help
++	  Support for early debug console using simple uart.
++
+ config SERIAL_SB1250_DUART
+ 	tristate "BCM1xxx on-chip DUART serial support"
+ 	depends on SIBYTE_SB1xxx_SOC=y
+@@ -1288,6 +1296,20 @@
+ 	  Set this to the number of serial ports you want the driver
+ 	  to support.
+ 
++config SIMPLE_UART
++	tristate "SIMPLE UART driver support"
++	select SERIAL_CORE
++	help
++	  Simple Uart Driver
++
++config SIMPLE_UART_CONSOLE
++	bool "Console on SIMPLE UART"
++	depends on SIMPLE_UART=y
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	help
++	  Enable system Console on SIMPLE UART
++
+ config SERIAL_RP2
+ 	tristate "Comtrol RocketPort EXPRESS/INFINITY support"
+ 	depends on PCI
+diff -urN linux-6.18.40/drivers/tty/serial/Makefile linux-6.18.40_new/drivers/tty/serial/Makefile
+--- linux-6.18.40/drivers/tty/serial/Makefile	2026-07-24 16:17:26.000000000 +0200
++++ linux-6.18.40_new/drivers/tty/serial/Makefile	2026-07-27 09:17:05.300481918 +0200
+@@ -9,6 +9,7 @@
+ obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
+ obj-$(CONFIG_SERIAL_EARLYCON_SEMIHOST) += earlycon-semihost.o
+ obj-$(CONFIG_SERIAL_EARLYCON_RISCV_SBI) += earlycon-riscv-sbi.o
++obj-$(CONFIG_SERIAL_EARLYCON_SIMPLE_UART) += earlycon-simple-uart.o
+ 
+ # These Sparc drivers have to appear before others such as 8250
+ # which share ttySx minor node space.  Otherwise console device
+@@ -31,6 +32,7 @@
+ obj-$(CONFIG_SERIAL_GRLIB_GAISLER_APBUART) += apbuart.o
+ obj-$(CONFIG_SERIAL_AR933X)		+= ar933x_uart.o
+ obj-$(CONFIG_SERIAL_ARC)		+= arc_uart.o
++obj-$(CONFIG_SIMPLE_UART)	+= simple-uart.o
+ obj-$(CONFIG_SERIAL_ATMEL)		+= atmel_serial.o
+ obj-$(CONFIG_SERIAL_BCM63XX)		+= bcm63xx_uart.o
+ obj-$(CONFIG_SERIAL_CLPS711X)		+= clps711x.o
+diff -urN linux-6.18.40/drivers/tty/serial/simple-uart.c linux-6.18.40_new/drivers/tty/serial/simple-uart.c
+--- linux-6.18.40/drivers/tty/serial/simple-uart.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-6.18.40_new/drivers/tty/serial/simple-uart.c	2026-07-27 09:43:08.847813604 +0200
+@@ -0,0 +1,612 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Simple Uart Console driver
@@ -232,22 +228,20 @@ Index: linux/drivers/tty/serial/simple-uart.c
 + */
 +static void simple_uart_tx_chars(struct uart_port *port)
 +{
-+	struct circ_buf *xmit = &port->state->xmit;
++	struct tty_port *tport = &port->state->port;
 +	int sent = 0;
-+	unsigned char ch;
++	u8 ch;
 +
 +	if (unlikely(port->x_char)) {
 +		simple_uart_reg_write(port, port->x_char, SIMPLE_UART_TX_RX_REG);
 +		port->icount.tx++;
 +		port->x_char = 0;
 +		sent = 1;
-+	} else if (!uart_circ_empty(xmit)) {
-+		ch = xmit->buf[xmit->tail];
-+		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
-+		port->icount.tx++;
++	} else if (!kfifo_is_empty(&tport->xmit_fifo)) {
++		uart_fifo_get(port, &ch);
 +		while (!(simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & TXEMPTY))
 +			cpu_relax();
-+        simple_uart_reg_write(port, ch, SIMPLE_UART_TX_RX_REG);
++		simple_uart_reg_write(port, ch, SIMPLE_UART_TX_RX_REG);
 +		sent = 1;
 +	}
 +
@@ -255,7 +249,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +	 * If num chars in xmit buffer are too few, ask tty layer for more.
 +	 * By Hard ISR to schedule processing in software interrupt part
 +	 */
-+	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
++	if (kfifo_len(&tport->xmit_fifo) < WAKEUP_CHARS)
 +		uart_write_wakeup(port);
 +
 +	if (sent)
@@ -274,7 +268,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +
 +static void simple_uart_rx_chars(struct uart_port *port, unsigned int status)
 +{
-+	unsigned int ch = 0;
++	u8 ch = 0;
 +
 +	/*
 +	 * UART has 4 deep RX-FIFO. Driver's recongnition of this fact
@@ -295,9 +289,9 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +		if (!(uart_handle_sysrq_char(port, ch)))
 +			uart_insert_char(port, status, 0, ch, TTY_NORMAL);
 +
-+		spin_unlock(&port->lock);
++		uart_port_unlock(port);
 +		tty_flip_buffer_push(&port->state->port);
-+		spin_lock(&port->lock);
++		uart_port_lock(port);
 +	} while (!((status = simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG)) & RXEMPTY));
 +}
 +
@@ -352,9 +346,9 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +	if (status & RXIENB) {
 +
 +		/* already in ISR, no need of xx_irqsave */
-+		spin_lock(&port->lock);
++		uart_port_lock(port);
 +		simple_uart_rx_chars(port, status);
-+		spin_unlock(&port->lock);
++		uart_port_unlock(port);
 +	}
 +
 +	if ((status & TXIENB) && (status & TXEMPTY)) {
@@ -365,14 +359,14 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +		// UART_TX_IRQ_DISABLE(port);
 +        simple_uart_disable_tx_irq(port);
 +
-+        spin_lock(&port->lock);
++        uart_port_lock(port);
 +
 +        if (!uart_tx_stopped(port))
 +        {
 +            simple_uart_tx_chars(port);
 +        }
 +
-+        spin_unlock(&port->lock);
++        uart_port_unlock(port);
 +	}
 +
 +	return IRQ_HANDLED;
@@ -433,7 +427,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +
 +    baud = uart_get_baud_rate(port, new, old, 0, 460800);
 +
-+	spin_lock_irqsave(&port->lock, flags);
++	uart_port_lock_irqsave(port, &flags);
 +
 +	// UART_ALL_IRQ_DISABLE(port);
 +    simple_uart_disable_tx_irq(port);
@@ -460,7 +454,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +
 +	uart_update_timeout(port, new->c_cflag, baud);
 +
-+	spin_unlock_irqrestore(&port->lock, flags);
++	uart_port_unlock_irqrestore(port, flags);
 +}
 +
 +static const char *simple_uart_type(struct uart_port *port)
@@ -509,7 +503,7 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +{
 +	unsigned char chr;
 +
-+	while (!(simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & RXEMPTY))
++	while (simple_uart_reg_read(port, SIMPLE_UART_STATUS_REG) & RXEMPTY)
 +		cpu_relax();
 +
 +	chr = simple_uart_reg_read(port, SIMPLE_UART_TX_RX_REG);
@@ -586,9 +580,9 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +	struct uart_port *port = &simple_uart_ports[co->index].port;
 +	unsigned long flags;
 +
-+	spin_lock_irqsave(&port->lock, flags);
++	uart_port_lock_irqsave(port, &flags);
 +	uart_console_write(port, s, count, simple_uart_console_putchar);
-+	spin_unlock_irqrestore(&port->lock, flags);
++	uart_port_unlock_irqrestore(port, flags);
 +}
 +
 +static struct console simple_uart_console = {
@@ -666,10 +660,9 @@ Index: linux/drivers/tty/serial/simple-uart.c
 +	return uart_add_one_port(&simple_uart_driver, &simple_uart_ports[dev_id].port);
 +}
 +
-+static int simple_uart_remove(struct platform_device *pdev)
++static void simple_uart_remove(struct platform_device *pdev)
 +{
-+	/* This will never be called */
-+	return 0;
++	/* nothing to do */
 +}
 +
 +static const struct of_device_id simple_uart_dt_ids[] = {
