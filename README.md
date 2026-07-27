@@ -50,11 +50,10 @@ The build scripts expect the prefix `riscv64-linux-uclibc-` to be available in `
 
 ## Building (RV64 NoMMU)
 
-Run the top-level orchestrator from the `busybox-linux/` directory:
+Run the top-level build script from the repo root:
 
 ```sh
-cd busybox-linux
-./build-all-rv64-nommu.sh
+./build-rv64-nommu.sh
 ```
 
 The script downloads sources, applies patches, builds BusyBox, then builds the Linux kernel. All intermediate files land in `busybox-linux/output/`.
@@ -101,8 +100,10 @@ build-linux-nommu-rv64.sh    -> allnoconfig + selective Kconfig enables
 
 ```
 linux_for_riscv_em/
-├── busybox-linux/          # Current build scripts
-│   ├── build-all-rv64-nommu.sh       # Top-level entry point (NoMMU)
+├── build-rv64-nommu.sh     # Top-level entry point (NoMMU) — run from repo root
+├── build-rv32-mmu.sh       # Top-level entry point (MMU)   — run from repo root
+├── busybox-linux/          # Build scripts
+│   ├── build-all-rv64-nommu.sh       # NoMMU orchestrator (called by top-level script)
 │   ├── build-busybox-nommu-rv64.sh   # BusyBox cross-compile + initramfs packaging
 │   ├── build-linux-nommu-rv64.sh     # Linux kernel build
 │   ├── download-busybox.sh           # Downloads BusyBox 1.38.0
