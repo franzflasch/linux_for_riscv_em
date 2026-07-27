@@ -10,6 +10,8 @@ make CROSS_COMPILE=riscv32-linux-gnu- defconfig
 sed -i 's:CONFIG_SSL_CLIENT=y:# CONFIG_SSL_CLIENT is not set:g' .config
 # Disable wget
 sed -i 's:CONFIG_WGET=y:# CONFIG_WGET is not set:g' .config
+# Disable TC
+sed -i 's:CONFIG_TC=y:# CONFIG_TC is not set:g' .config
 # Enable static
 #sed -i 's:# CONFIG_STATIC is not set:CONFIG_STATIC=y:g' .config
 
@@ -31,12 +33,12 @@ cp ../../../busybox-init init
 mkdir -p lib
 mkdir -p usr/lib
 
-cp /opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/ld-linux-riscv32-ilp32.so* lib/
+cp /opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/ld-linux-riscv32-ilp32.so* lib/
 
-mkdir -p opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/
-cp /opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/libresolv.so* opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/
-cp /opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/libm.so* opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/
-cp /opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/libc.so* opt/local/cross-tool-riscv32-gcc13/riscv32-linux-gnu/lib/
+mkdir -p opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/
+cp /opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/libresolv.so* opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/
+cp /opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/libm.so* opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/
+cp /opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/libc.so* opt/local/cross-tool-riscv32-gcc16/riscv32-linux-gnu/lib/
 
 # Add hello world example
 riscv32-linux-gnu-gcc ../../../hello_world.c -o hello
